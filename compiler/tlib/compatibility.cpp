@@ -19,6 +19,12 @@
  ************************************************************************
  ************************************************************************/
 
+/*
+    Modified by Ouroboros Audio on 2026-01-17.
+    Changes: forced explicit WinAPI A/W calls and aligned mkdir with
+    the Windows declaration in compatibility.hh.
+*/
+
 #include <stdint.h>
 #include <stdlib.h>
 #include <string>
@@ -81,12 +87,12 @@ int isatty(int file)
 #if defined(_MBCS) || __MINGW32__
 int chdir(const char* path)
 {
-    return !SetCurrentDirectory(path);
+    return !SetCurrentDirectoryA(path);
 }
 
-int mkdir(const char* path, unsigned int attribute)
+int mkdir(const char* path)
 {
-    if (CreateDirectory(path, NULL) == 0) {
+    if (CreateDirectoryA(path, NULL) == 0) {
         // mkdir has to be successfull in case the path already exists
         if (GetLastError() == ERROR_ALREADY_EXISTS) {
             return 0;
@@ -100,32 +106,39 @@ int mkdir(const char* path, unsigned int attribute)
 
 char* getcwd(char* str, int size)
 {
-    GetCurrentDirectory(size, str);
+    GetCurrentDirectoryA(size, str);
     return str;
 }
 void getFaustPathname(char* str, unsigned int size)
 {
-    GetModuleFileName(NULL, str, size);
+    GetModuleFileNameA(NULL, str, size);
 }
 #else
-bool chdir(const char* path)
+int chdir(const char* path)
 {
     wchar_t wstr[2048];
     mbstowcs(wstr, path, 2048);
-    return !SetCurrentDirectory(wstr);
+    return !SetCurrentDirectoryW(wstr);
 }
 
-int mkdir(const char* path, unsigned int attribute)
+int mkdir(const char* path)
 {
     wchar_t wstr[2048];
     mbstowcs(wstr, path, 2048);
-    return CreateDirectory(wstr, NULL);
+    if (CreateDirectoryW(wstr, NULL) == 0) {
+        if (GetLastError() == ERROR_ALREADY_EXISTS) {
+            return 0;
+        } else {
+            return -1;
+        }
+    }
+    return 0;
 }
 
 char* getcwd(char* str, unsigned int size)
 {
     wchar_t wstr[2048];
-    GetCurrentDirectory(2048, wstr);
+    GetCurrentDirectoryW(2048, wstr);
     wcstombs(str, wstr, size);
     return str;
 }
@@ -133,7 +146,7 @@ char* getcwd(char* str, unsigned int size)
 void getFaustPathname(char* str, unsigned int size)
 {
     wchar_t wstr[2048];
-    GetModuleFileName(NULL, wstr, 2048);
+    GetModuleFileNameW(NULL, wstr, 2048);
     wcstombs(str, wstr, size);
 }
 
